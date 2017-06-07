@@ -1,14 +1,14 @@
 package main
 
 import (
-	trace "github.com/pl0th/go-traceroute"
 	"errors"
-	"net"
-	"time"
 	"fmt"
-	"github.com/urfave/cli"
-	"os"
 	c "github.com/fatih/color"
+	trace "github.com/pl0th/go-traceroute"
+	"github.com/urfave/cli"
+	"net"
+	"os"
+	"time"
 )
 
 func main() {
@@ -16,30 +16,29 @@ func main() {
 	app.Version = "0.1"
 	app.Name = "go-traceroute"
 	app.Usage = "A coloured traceroute implemented in golang"
-	app.Flags = []cli.Flag {
+	app.Flags = []cli.Flag{
 		cli.IntFlag{
-			Name: "ttl, T",
-			Value: 64, 
+			Name:  "ttl, T",
+			Value: 64,
 			Usage: "sets the max. TTL value",
 		},
-		cli.Float64Flag {
-			Name: "timeout, o",
-			Value: 3, 
+		cli.Float64Flag{
+			Name:  "timeout, o",
+			Value: 3,
 			Usage: "sets the timeout for the icmp echo request in seconds",
 		},
 		cli.IntFlag{
-			Name: "tries, t",
-			Value: 3, 
+			Name:  "tries, t",
+			Value: 3,
 			Usage: "sets the amount of tries",
 		},
 		cli.BoolFlag{
-			Name: "colour, c",
-			Usage: "disables colour",
+			Name:        "colour, c",
+			Usage:       "disables colour",
 			Destination: &c.NoColor,
 		},
 	}
 
-	
 	app.Action = func(ctx *cli.Context) (err error) {
 		if len(ctx.Args()) == 0 {
 			cli.ShowAppHelp(ctx)
@@ -47,7 +46,6 @@ func main() {
 		}
 
 		ip := net.ParseIP(ctx.Args()[0])
-
 
 		if ip == nil {
 			ips, err := net.LookupIP(ctx.Args()[0])
@@ -57,14 +55,12 @@ func main() {
 			}
 			ip = ips[0]
 		}
-		traceData := trace.Exec(ip, time.Duration(ctx.Float64("timeout") * float64(time.Second.Nanoseconds())), ctx.Int("tries"), ctx.Int("ttl"))
-
-
-		
+		traceData := trace.Exec(ip, time.Duration(ctx.Float64("timeout")*float64(time.Second.Nanoseconds())), ctx.Int("tries"), ctx.Int("ttl"))
 
 		hops := make([][]printData, 0)
 		err = traceData.Next()
-		Loop: for idxTry := 0; err == nil; err = traceData.Next() {
+	Loop:
+		for idxTry := 0; err == nil; err = traceData.Next() {
 			usedIPs := make(map[string][]time.Duration)
 			hops = append(hops, make([]printData, 0))
 			for idx := 0; idx < traceData.Tries; idx++ {
@@ -82,7 +78,7 @@ func main() {
 					addrString := fmt.Sprintf("%v (%v) ", c.YellowString(hop.AddrIP.String()), c.CyanString(hop.AddrDNS[0]))
 					if hop.AddrIP == nil {
 						addrString = c.RedString("no response ")
-					} 
+					}
 
 					fmt.Printf("%v: %v", idxTry, addrString)
 					for _, lat := range usedIPs[hop.AddrIP.String()] {
@@ -91,15 +87,15 @@ func main() {
 							formString = fmt.Sprintf("%v ", latString[:4]+latString[len(latString)-1:])
 						} else if lat < time.Millisecond && lat > time.Nanosecond {
 							formString = fmt.Sprintf("%v ", latString[:4]+latString[len(latString)-3:])
-						} else {	
+						} else {
 							formString = fmt.Sprintf("%v ", latString[:4]+latString[len(latString)-2:])
 						}
-						fmt.Printf(c.MagentaString(formString))//µs
+						fmt.Printf(c.MagentaString(formString)) //µs
 					}
 					fmt.Println()
 				}
 				delete(usedIPs, hop.AddrIP.String())
-				if traceData.Dest.Equal(hop.AddrIP) && traceData.Tries == idx + 1 {
+				if traceData.Dest.Equal(hop.AddrIP) && traceData.Tries == idx+1 {
 					break Loop
 				}
 			}
@@ -113,12 +109,12 @@ func main() {
 		return
 	}
 
-	app.Run(os.Args)	
-	
+	app.Run(os.Args)
+
 }
 
 type printData struct {
-	latencies	[]time.Duration
-	count		int
+	latencies []time.Duration
+	count     int
 	trace.Hop
 }
