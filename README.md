@@ -3,7 +3,7 @@ go-traceroute
 [![Go Report Card](https://goreportcard.com/badge/github.com/pl0th/go-traceroute)](https://goreportcard.com/report/github.com/pl0th/go-traceroute)
 
 ## Installation
-Please be aware that mac os doesn't support the setcap command.
+Please be aware that macOS doesn't support the setcap command.
 ```bash
 go get github.com/pl0th/go-traceroute
 cd $GOPATH/src/github.com/pl0th/cmd

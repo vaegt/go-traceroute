@@ -32,6 +32,16 @@ func main() {
 			Value: 3,
 			Usage: "sets the amount of tries",
 		},
+		cli.StringFlag{
+			Name:  "protocol, P",
+			Value: "ip4:icmp",
+			Usage: "sets the request protocol",
+		},
+		cli.IntFlag{
+			Name:  "port, p",
+			Value: 33434,
+			Usage: "sets the port for udp requests",
+		},
 		cli.BoolFlag{
 			Name:        "colour, c",
 			Usage:       "disables colour",
@@ -55,7 +65,12 @@ func main() {
 			}
 			ip = ips[0]
 		}
-		traceData := trace.Exec(ip, time.Duration(ctx.Float64("timeout")*float64(time.Second.Nanoseconds())), ctx.Int("tries"), ctx.Int("ttl"))
+		traceData := trace.TraceData{}
+		if ctx.String("protocol") == "udp" {
+			traceData = trace.Exec(ip, time.Duration(ctx.Float64("timeout")*float64(time.Second.Nanoseconds())), ctx.Int("tries"), ctx.Int("ttl"), ctx.String("protocol"), ctx.Int("port"))
+		} else {
+			traceData = trace.Exec(ip, time.Duration(ctx.Float64("timeout")*float64(time.Second.Nanoseconds())), ctx.Int("tries"), ctx.Int("ttl"), ctx.String("protocol"), 0)
+		}
 
 		hops := make([][]printData, 0)
 		err = traceData.Next()
