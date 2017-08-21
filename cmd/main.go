@@ -34,7 +34,7 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "protocol, P",
-			Value: "ip4:icmp",
+			Value: "icmp",
 			Usage: "sets the request protocol",
 		},
 		cli.IntFlag{

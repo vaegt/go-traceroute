@@ -4,23 +4,30 @@ import (
 	"errors"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 	"math/rand"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 )
 
-// Exec returns TraceData with initialized Hops.
+// Exec returns TraceData with initialized Hops and inserts the IP version into the protocol
 func Exec(dest net.IP, timeout time.Duration, tries int, maxTTL int, proto string, port int) (data TraceData) {
-	return TraceData{
-		Hops:     make([][]Hop, tries),
-		Dest:     dest,
-		Timeout:  timeout,
-		Tries:    tries,
-		MaxTTL:   maxTTL,
-		Protocol: proto,
-		Port:     port,
+	data = TraceData{
+		Hops:    make([][]Hop, tries),
+		Dest:    dest,
+		Timeout: timeout,
+		Tries:   tries,
+		MaxTTL:  maxTTL,
+		Port:    port,
 	}
+	if dest.To4() == nil {
+		data.Protocol = "ip6:" + proto
+	} else {
+		data.Protocol = "ip4:" + proto
+	}
+	return
 
 }
 
@@ -56,24 +63,48 @@ func doHop(ttl int, dest net.IP, timeout time.Duration, proto string, port int) 
 		return
 	}
 	defer conn.Close()
-	newConn := ipv4.NewConn(conn)
-	if err = newConn.SetTTL(ttl); err != nil {
-		return
-	}
 
+	ipProto, msgProto, listenProto := strings.Split(proto, ":")[0], strings.Split(proto, ":")[1], "icmp"
 	req := []byte{}
-	if proto == "udp" {
+	listenAddress := "0.0.0.0"
+
+	if msgProto == "udp" {
 		req = []byte("TABS")
-	} else if proto == "ip4:icmp" {
-		req, err = createICMPEcho()
-	} else {
-		return currentHop, errors.New("protocol not implemented")
 	}
 
-	if err != nil {
-		return
+	if ipProto == "ip4" {
+		newConn := ipv4.NewConn(conn)
+		if err = newConn.SetTTL(ttl); err != nil {
+			return
+		}
+
+		if msgProto == "icmp" {
+			req, err = createICMPEcho(ipv4.ICMPTypeEcho)
+		} else {
+			return currentHop, errors.New("protocol not implemented")
+		}
+
+		if err != nil {
+			return
+		}
+	} else if ipProto == "ip6" {
+		listenAddress = "::0"
+		newConn := ipv6.NewConn(conn)
+		if err = newConn.SetHopLimit(ttl); err != nil {
+			return
+		}
+
+		if msgProto == "icmp" || msgProto == "ipv6-icmp" {
+			req, err = createICMPEcho(ipv6.ICMPTypeEchoRequest)
+			listenProto, msgProto = "ipv6-icmp", "ipv6-icmp"
+		} else {
+			return currentHop, errors.New("protocol not implemented")
+		}
+		if err != nil {
+			return
+		}
 	}
-	packetConn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	packetConn, err := icmp.ListenPacket(ipProto+":"+listenProto, listenAddress)
 	if err != nil {
 		return
 	}
@@ -110,7 +141,7 @@ func doHop(ttl int, dest net.IP, timeout time.Duration, proto string, port int) 
 	return currentHop, err
 }
 
-// executes all doHops for all tries.
+// All executes all doHops for all tries.
 func (data *TraceData) All() (err error) {
 	for try := 0; try < data.Tries; try++ {
 		for ttl := 1; ttl <= data.MaxTTL; ttl++ {
@@ -131,9 +162,9 @@ func (data *TraceData) All() (err error) {
 	return
 }
 
-func createICMPEcho() (req []byte, err error) {
+func createICMPEcho(ICMPTypeEcho icmp.Type) (req []byte, err error) {
 	echo := icmp.Message{
-		Type: ipv4.ICMPTypeEcho, Code: 0,
+		Type: ICMPTypeEcho, Code: 0,
 		Body: &icmp.Echo{
 			ID:   rand.Int(),
 			Seq:  1, // TODO Sequence should be incremented every Hop & the id should be changed on every try(not random but different)
