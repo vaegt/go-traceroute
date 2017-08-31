@@ -28,7 +28,6 @@ func Exec(dest net.IP, timeout time.Duration, tries int, maxTTL int, proto strin
 		data.Protocol = "ip4:" + proto
 	}
 	return
-
 }
 
 // Next executes the doHop method for every try.
@@ -96,7 +95,7 @@ func doHop(ttl int, dest net.IP, timeout time.Duration, proto string, port int) 
 
 		if msgProto == "icmp" || msgProto == "ipv6-icmp" {
 			req, err = createICMPEcho(ipv6.ICMPTypeEchoRequest)
-			listenProto, msgProto = "ipv6-icmp", "ipv6-icmp"
+			listenProto = "ipv6-icmp"
 		} else {
 			return currentHop, errors.New("protocol not implemented")
 		}
