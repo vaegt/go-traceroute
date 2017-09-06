@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"net"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -21,11 +20,12 @@ func Exec(dest net.IP, timeout time.Duration, tries int, maxTTL int, proto strin
 		Tries:   tries,
 		MaxTTL:  maxTTL,
 		Port:    port,
+		Proto:   proto,
 	}
 	if dest.To4() == nil {
-		data.Protocol = "ip6:" + proto
+		data.IPv = "6"
 	} else {
-		data.Protocol = "ip4:" + proto
+		data.IPv = "4"
 	}
 	return
 }
@@ -37,7 +37,7 @@ func (data *TraceData) Next() (err error) {
 		return errors.New("Maximum TTL reached")
 	}
 	for try := 0; try < data.Tries; try++ {
-		currentHop, err := doHop(ttl, data.Dest, data.Timeout, data.Protocol, data.Port)
+		currentHop, err := doHop(ttl, data.Dest, data.Timeout, data.Proto, data.Port, data.IPv)
 		if err != nil {
 			return err
 		}
@@ -50,60 +50,59 @@ func (data *TraceData) Next() (err error) {
 	return
 }
 
-func doHop(ttl int, dest net.IP, timeout time.Duration, proto string, port int) (currentHop Hop, err error) {
+func doHop(ttl int, dest net.IP, timeout time.Duration, proto string, port int, ipv string) (currentHop Hop, err error) {
 	var destString string
 	if port == 0 {
 		destString = dest.String()
 	} else {
 		destString = dest.String() + ":" + strconv.Itoa(port)
 	}
-	conn, err := net.Dial(proto, destString)
+	req := []byte{}
+	dialProto := proto
+
+	if proto == "udp" {
+		req = []byte("TABS")
+		dialProto += ipv
+	} else if proto == "icmp" {
+		dialProto = "ip" + ipv + ":" + proto
+	} else {
+		return currentHop, errors.New("protocol not implemented")
+	}
+
+	conn, err := net.Dial(dialProto, destString)
 	if err != nil {
 		return
 	}
 	defer conn.Close()
 
-	ipProto, msgProto, listenProto := strings.Split(proto, ":")[0], strings.Split(proto, ":")[1], "icmp"
-	req := []byte{}
 	listenAddress := "0.0.0.0"
 
-	if msgProto == "udp" {
-		req = []byte("TABS")
-	}
-
-	if ipProto == "ip4" {
+	if ipv == "4" {
 		newConn := ipv4.NewConn(conn)
 		if err = newConn.SetTTL(ttl); err != nil {
 			return
 		}
-
-		if msgProto == "icmp" {
+		if proto == "icmp" {
 			req, err = createICMPEcho(ipv4.ICMPTypeEcho)
-		} else {
-			return currentHop, errors.New("protocol not implemented")
+			if err != nil {
+				return
+			}
 		}
-
-		if err != nil {
-			return
-		}
-	} else if ipProto == "ip6" {
+	} else if ipv == "6" {
 		listenAddress = "::0"
 		newConn := ipv6.NewConn(conn)
 		if err = newConn.SetHopLimit(ttl); err != nil {
 			return
 		}
-
-		if msgProto == "icmp" || msgProto == "ipv6-icmp" {
+		if proto == "icmp" {
 			req, err = createICMPEcho(ipv6.ICMPTypeEchoRequest)
-			listenProto = "ipv6-icmp"
-		} else {
-			return currentHop, errors.New("protocol not implemented")
-		}
-		if err != nil {
-			return
+			if err != nil {
+				return
+			}
 		}
 	}
-	packetConn, err := icmp.ListenPacket(ipProto+":"+listenProto, listenAddress)
+
+	packetConn, err := icmp.ListenPacket("ip"+ipv+":"+"icmp", listenAddress)
 	if err != nil {
 		return
 	}
@@ -144,7 +143,7 @@ func doHop(ttl int, dest net.IP, timeout time.Duration, proto string, port int) 
 func (data *TraceData) All() (err error) {
 	for try := 0; try < data.Tries; try++ {
 		for ttl := 1; ttl <= data.MaxTTL; ttl++ {
-			currentHop, err := doHop(ttl, data.Dest, data.Timeout, data.Protocol, data.Port)
+			currentHop, err := doHop(ttl, data.Dest, data.Timeout, data.Proto, data.Port, data.IPv)
 			if err != nil {
 				return err
 			}

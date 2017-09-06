@@ -10,7 +10,7 @@ import (
 func TestExec(test *testing.T) {
 	expected := returnData()
 
-	got := Exec(expected.Dest, expected.Timeout, expected.Tries, expected.MaxTTL, expected.Protocol, expected.Port)
+	got := Exec(expected.Dest, expected.Timeout, expected.Tries, expected.MaxTTL, expected.Proto, expected.Port)
 	if !reflect.DeepEqual(expected, got) {
 		test.Errorf("Error: Exec data expected %v got %v", expected, got)
 	}
@@ -63,15 +63,17 @@ func returnData() TraceData {
 	timeout := 1 * time.Second
 	tries := 1
 	maxTTL := 16
-	proto := "ip4:icmp"
+	proto := "icmp"
+	port := 0
+	ipv := "4"
 
-	return TraceData{make([][]Hop, tries), dest, timeout, tries, maxTTL, proto, 0}
+	return TraceData{make([][]Hop, tries), dest, timeout, tries, maxTTL, port, proto, ipv}
 
 }
 
 func udpReturnData() (data TraceData) {
 	data = returnData()
-	data.Protocol = "udp"
+	data.Proto = "udp"
 	data.Port = 33434
 	return
 }

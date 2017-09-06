@@ -7,13 +7,14 @@ import (
 
 // TraceData represents data received by executing traceroute.
 type TraceData struct {
-	Hops     [][]Hop
-	Dest     net.IP
-	Timeout  time.Duration
-	Tries    int
-	MaxTTL   int
-	Protocol string
-	Port     int
+	Hops    [][]Hop
+	Dest    net.IP
+	Timeout time.Duration
+	Tries   int
+	MaxTTL  int
+	Port    int
+	Proto   string
+	IPv     string
 }
 
 // Hop represents a path between a source and a destination.
