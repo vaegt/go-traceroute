@@ -11,9 +11,11 @@ import (
 	"time"
 )
 
+const AppVersion = "dev" // should be overwritten by ldflags
+
 func main() {
 	app := cli.NewApp()
-	app.Version = "0.1"
+	app.Version = AppVersion
 	app.Name = "go-traceroute"
 	app.Usage = "A coloured traceroute implemented in golang"
 	app.Flags = []cli.Flag{
@@ -60,7 +62,7 @@ func main() {
 		if ip == nil {
 			ips, err := net.LookupIP(ctx.Args()[0])
 			if err != nil || len(ips) == 0 {
-				c.Yellow("Please provide a valid IP address or fqdn")
+				c.Yellow("Please provide a valid IP address or FQDN")
 				return cli.NewExitError(errors.New(c.RedString("Error: %v", err.Error())), 137)
 			}
 			ip = ips[0]
