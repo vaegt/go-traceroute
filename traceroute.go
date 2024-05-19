@@ -51,37 +51,14 @@ func (data *TraceData) Next() (err error) {
 }
 
 func doHop(ttl int, dest net.IP, timeout time.Duration, proto string, port int, ipv string) (currentHop Hop, err error) {
-	var destString string
-	if port == 0 {
-		destString = dest.String()
-	} else {
-		destString = dest.String() + ":" + strconv.Itoa(port)
-	}
 	req := []byte{}
-	dialProto := proto
-
-	if proto == "udp" {
-		req = []byte("TABS")
-		dialProto += ipv
-	} else if proto == "icmp" {
-		dialProto = "ip" + ipv + ":" + proto
-	} else {
-		return currentHop, errors.New("protocol not implemented")
-	}
-
-	conn, err := net.Dial(dialProto, destString)
+	conn, err := createConnection(dest, port, ttl, ipv, proto)
 	if err != nil {
-		return
+
 	}
-	defer conn.Close()
 
 	listenAddress := "0.0.0.0"
-
 	if ipv == "4" {
-		newConn := ipv4.NewConn(conn)
-		if err = newConn.SetTTL(ttl); err != nil {
-			return
-		}
 		if proto == "icmp" {
 			req, err = createICMPEcho(ipv4.ICMPTypeEcho)
 			if err != nil {
@@ -90,10 +67,6 @@ func doHop(ttl int, dest net.IP, timeout time.Duration, proto string, port int, 
 		}
 	} else if ipv == "6" {
 		listenAddress = "::0"
-		newConn := ipv6.NewConn(conn)
-		if err = newConn.SetHopLimit(ttl); err != nil {
-			return
-		}
 		if proto == "icmp" {
 			req, err = createICMPEcho(ipv6.ICMPTypeEchoRequest)
 			if err != nil {
@@ -160,6 +133,42 @@ func (data *TraceData) All() (err error) {
 	return
 }
 
+func createConnection(dest net.IP, port, ttl int, ipv, proto string) (net.Conn, error) {
+	var destString string
+	if port == 0 {
+		destString = dest.String()
+	} else {
+		destString = dest.String() + ":" + strconv.Itoa(port)
+	}
+	dialProto := proto
+
+	if proto == "udp" {
+		dialProto += ipv
+	} else if proto == "icmp" {
+		dialProto = "ip" + ipv + ":" + proto
+	} else {
+		return  nil, errors.New("protocol not implemented")
+	}
+
+	conn, err := net.Dial(dialProto, destString)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+
+	if ipv == "4" {
+		newConn := ipv4.NewConn(conn)
+		err = newConn.SetTTL(ttl)
+		return conn, err
+	} else if ipv == "6" {
+		newConn := ipv6.NewConn(conn)
+		err = newConn.SetHopLimit(ttl)
+		return conn, err
+	}
+	return nil, errors.New("no valid ip version given")
+}
+
 func createICMPEcho(ICMPTypeEcho icmp.Type) (req []byte, err error) {
 	echo := icmp.Message{
 		Type: ICMPTypeEcho, Code: 0,
@@ -171,4 +180,8 @@ func createICMPEcho(ICMPTypeEcho icmp.Type) (req []byte, err error) {
 
 	req, err = echo.Marshal(nil)
 	return
+}
+
+type IPConn interface {
+	Write([]byte)
 }
